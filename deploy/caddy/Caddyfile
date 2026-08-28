@@ -1,0 +1,32 @@
+# Origin for travel.bunsenbrenner.org (not yet provisioned -- see README.md's "Deployment
+# status"). Caddy terminates TLS, serves the static planner page, and reverse-proxies /api/* to
+# the bridge -- the bridge IS the whole API surface, same shape as every sibling demo's Caddyfile.
+#
+# Deliberately public, no /gate/check gate: this is a marketing/demo page with no user data and
+# no privileged action (see server.js -- /api/plan only ever runs a fixed, operator-defined
+# pipeline: geocode -> OSRM -> LLM-format). Revisit if that changes.
+#
+# While the tunnel is still Gelb (no dedicated Grün cert yet), the edge terminates TLS itself
+# with its shared wildcard cert and forwards PLAINTEXT to the origin -- same `auto_https off` +
+# no `tls` directive fix every other Gelb demo's Caddyfile needed. Switch to
+# `tls /certs/fullchain.pem /certs/privkey.pem` once this tunnel reaches Grün.
+{
+	auto_https off
+}
+
+:443 {
+	encode gzip
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+	}
+
+	@shell path *.html *.js *.css /
+	header @shell Cache-Control "no-cache"
+
+	@api path /api/*
+	reverse_proxy @api bridge:8789
+
+	root * /srv
+	file_server
+}

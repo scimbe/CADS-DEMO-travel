@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Reiseplaner ohne Halluzination</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; max-width: 960px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+  h1 { font-size: 1.5rem; }
+  p.lede { color: #555; }
+  form { display: grid; gap: 0.75rem; margin: 1.5rem 0; max-width: 640px; }
+  label { font-size: 0.85rem; font-weight: 600; }
+  input, select, button { font: inherit; padding: 0.5rem 0.6rem; border-radius: 6px; border: 1px solid #999; }
+  button { cursor: pointer; background: #1a5fb4; color: white; border: none; font-weight: 600; }
+  button:disabled { opacity: 0.6; cursor: default; }
+  .chips { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-top: 0.25rem; }
+  .chip { font-size: 0.8rem; padding: 0.25rem 0.6rem; border-radius: 999px; border: 1px solid #aaa; background: none; color: inherit; }
+  .panels { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1.5rem; }
+  @media (max-width: 700px) { .panels { grid-template-columns: 1fr; } }
+  .panel { border: 1px solid #ccc; border-radius: 8px; padding: 1rem; min-height: 8rem; }
+  .panel h2 { margin-top: 0; font-size: 1rem; }
+  .panel pre { white-space: pre-wrap; word-break: break-word; font-size: 0.8rem; max-height: 22rem; overflow: auto; }
+  .verify-pass { color: #2b7a2b; font-weight: 700; }
+  .verify-fail { color: #c0392b; font-weight: 700; }
+  .muted { color: #777; font-size: 0.85rem; }
+  .error { color: #c0392b; }
+</style>
+</head>
+<body>
+<h1>Reiseplaner ohne Halluzination</h1>
+<p class="lede">
+  Der Routen-Fakt (Distanz, Fahrzeit) kommt <strong>immer</strong> von einer echten, selbst
+  gehosteten OSRM-Routing-Engine auf echten OpenStreetMap-Daten (Bremen). Das Sprachmodell
+  berechnet nichts — es liest nur, was die Engine geliefert hat, und formatiert es passend zur
+  gewünschten Präferenz. Beide Seiten stehen unten nebeneinander, damit du es selbst nachprüfen
+  kannst.
+</p>
+
+<form id="plan-form">
+  <label for="text">Anfrage (freier Text, Deutsch)</label>
+  <input id="text" name="text" type="text" required
+         value="von Bremen Flughafen nach Vegesack, Autobahnen vermeiden"
+         autocomplete="off" />
+  <div class="chips">
+    <button type="button" class="chip" data-text="von Bremen Hauptbahnhof nach Vegesack, schnellste Route">Hbf → Vegesack (schnellste)</button>
+    <button type="button" class="chip" data-text="von Bremen Flughafen nach Vegesack, Autobahnen vermeiden">Flughafen → Vegesack (ohne Autobahn)</button>
+    <button type="button" class="chip" data-text="von Bremen Hauptbahnhof nach Bremen Flughafen, kürzeste Strecke">Hbf → Flughafen (kürzeste)</button>
+  </div>
+  <button type="submit" id="submit-btn">Route planen</button>
+</form>
+
+<div id="status" class="muted"></div>
+
+<div class="panels">
+  <div class="panel">
+    <h2>Rohdaten der Routing-Engine (OSRM)</h2>
+    <div id="raw-panel" class="muted">Noch keine Anfrage gestellt.</div>
+  </div>
+  <div class="panel">
+    <h2>Antwort des Sprachmodells</h2>
+    <div id="llm-panel" class="muted">Noch keine Anfrage gestellt.</div>
+  </div>
+</div>
+
+<p class="muted" style="margin-top:2rem;">
+  Diese Demo deckt aktuell nur den Großraum Bremen ab (Auto-Profil). Siehe
+  <a href="https://github.com/scimbe/CADS-DEMO-travel">GitHub-Repository</a> für Quellcode,
+  Tests und den vollen Nachweis (<code>docs/acceptance-report.md</code>).
+</p>
+
+<script src="app.js"></script>
+</body>
+</html>

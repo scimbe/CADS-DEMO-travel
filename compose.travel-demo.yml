@@ -1,0 +1,102 @@
+# Demo: travel.bunsenbrenner.org — real OSRM routing, LLM only formats. Same overall shape as
+# CADS-DEMO-sort's compose file (bridge is the whole API surface; Caddy serves static + proxies).
+#
+#   docker compose -f compose.travel-demo.yml up -d osrm-car bridge   # local dev / acceptance check
+#   docker compose -f compose.travel-demo.yml --env-file .env up --build -d   # full stack incl. Caddy
+#
+# osrm-car publishes NO host port -- only the bridge reaches it, over the compose network. This
+# is deliberate (see docs/ARCHITECTURE.md at the workspace root): no origin exposes a host port,
+# reachability is agent-mediated.
+#
+# NO ct-agent service in this file (unlike sort/kali/game2048's compose files) -- deliberately,
+# not an oversight. Provisioning travel.bunsenbrenner.org needs operator confirmation first (see
+# README.md's "Deployment status"), and this build round scopes to the acceptance bar (real
+# routing, real anti-hallucination check), not public exposure. When that confirmation lands,
+# copy CADS-DEMO-sort/Agent.Dockerfile + its compose service block verbatim (they are already
+# fully generic, not sort-specific) and add a `travel-demo-agent` service here the same shape as
+# sort's -- do not build a stub in the meantime; an untested Dockerfile that LOOKS wired up is
+# worse than an honestly-absent one.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  osrm-car:
+    build:
+      context: ./osrm
+      dockerfile: Dockerfile
+    volumes:
+      # The graph itself (bremen-latest.osrm*) lives OUTSIDE the image (see osrm/build-graph.sh)
+      # so rebuilding/rotating the dataset never requires rebuilding this image.
+      - ./osrm/data:/data:ro
+    healthcheck:
+      # osrm/osrm-backend's own image (Debian stretch) ships neither curl nor wget -- bash IS
+      # present, so a raw /dev/tcp connect attempt is the cheapest real liveness check available
+      # without installing anything extra into an otherwise-untouched upstream image.
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/5000"]
+      interval: 10s
+      timeout: 5s
+      start_period: 10s
+      retries: 5
+    restart: unless-stopped
+    logging: *default-logging
+
+  bridge:
+    build:
+      context: .
+      dockerfile: bridge/Dockerfile
+    environment:
+      - TRAVEL_BRIDGE_LISTEN=0.0.0.0:8789
+      - OSRM_BASE_URL=http://osrm-car:5000
+      - LITELLM_BASE_URL=${LITELLM_BASE_URL:-}
+      - LITELLM_API_KEY=${LITELLM_API_KEY:-}
+      - LITELLM_DEFAULT_MODEL=${LITELLM_DEFAULT_MODEL:-local-devstral-small2}
+      - "TRAVEL_DATASET_LABEL=bremen-latest (md5 0061299ee69f4bce070ea86e416ddc93)"
+      # Quoted: an unquoted "key: value" shape (the "contact: scimbe" bit) makes a YAML parser
+      # read the whole list entry as a mapping instead of a plain string -- confirmed live
+      # (`docker compose config` failed with "unexpected type map[string]interface {}" until
+      # this got quoted).
+      - "NOMINATIM_USER_AGENT=${NOMINATIM_USER_AGENT:-CADS-DEMO-travel/0.1 (bunsenbrenner.org demo; contact: scimbe)}"
+    depends_on:
+      osrm-car:
+        condition: service_healthy
+    # No `ports:` mapping -- only reachable via the Caddy origin below, same discipline as every
+    # sibling demo's bridge service.
+    restart: unless-stopped
+    logging: *default-logging
+
+  travel-demo-origin:
+    build:
+      context: .
+      dockerfile: Caddy.Dockerfile
+    volumes:
+      # Mount the DIRECTORY, not individual files -- see CADS-DEMO-sort#39 (single-file bind
+      # mounts pin an inode, not a path; a directory mount re-resolves on every request).
+      - ./deploy/caddy:/etc/caddy:ro
+      - ./site:/srv:ro
+      # Soft-defaulted (unlike sort's SORT_CERT_DIR, which hard-requires `:?`) because docker
+      # compose interpolates EVERY service's env/volumes up front, even ones you don't target --
+      # confirmed live: `docker compose ... build osrm-car bridge` still fails to interpolate if
+      # this var is unset. The documented "local dev / acceptance check" workflow above only ever
+      # touches osrm-car+bridge, so this mustn't block that; deploy/caddy/no-certs/ is a real,
+      # committed, empty directory for exactly this default (harmless -- the origin container that
+      # would actually read /certs is never started in that workflow). Set TRAVEL_CERT_DIR for a
+      # real deploy (fullchain.pem+privkey.pem from the operator).
+      - ${TRAVEL_CERT_DIR:-./deploy/caddy/no-certs}:/certs:ro
+      - travel_demo_caddy_data:/data
+    expose:
+      - "443"
+    depends_on:
+      - bridge
+    restart: unless-stopped
+    logging: *default-logging
+
+volumes:
+  travel_demo_caddy_data:
+
+networks:
+  default:
+    name: ${PLANE_NETWORK:-ct-selfhost_default}
+    external: true
