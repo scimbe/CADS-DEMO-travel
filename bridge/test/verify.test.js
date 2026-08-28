@@ -72,6 +72,25 @@ test("verify: an unrelated bare number in prose is a warning, not a hard fail", 
   assert.equal(result.pass, true);
 });
 
+// Regression for a real bug found in independent review: a compound "N Minuten und M Sekunden"
+// restatement (common LLM phrasing for a short trip's precise duration, e.g. the demo's own
+// "Hbf -> Flughafen" example chip) used to false-hard-fail, because the bare "min" regex caught
+// just the "N" and checked it alone against the WHOLE route duration -- as if N minutes were the
+// entire trip -- even when N:M together is exactly correct.
+test("verify: a compound 'N Minuten und M Sekunden' restatement that matches the real duration passes", () => {
+  // pickedRoute.duration is 2275.3s = 37*60 + 55.3 -> rounds to 2275s = 37 min 55 sek exactly.
+  const answer = '<ROUTE_FACTS>{"distance_m":23678,"duration_s":2275}</ROUTE_FACTS> Das dauert etwa 37 Minuten und 55 Sekunden.';
+  const result = verify(answer, pickedRoute);
+  assert.equal(result.pass, true, `expected pass, got hardFails=${JSON.stringify(result.hardFails)}`);
+});
+
+test("verify: a compound 'N Minuten und M Sekunden' restatement that genuinely disagrees is a hard fail", () => {
+  const answer = '<ROUTE_FACTS>{"distance_m":23678,"duration_s":2275}</ROUTE_FACTS> Das dauert etwa 10 Minuten und 0 Sekunden.';
+  const result = verify(answer, pickedRoute);
+  assert.equal(result.pass, false);
+  assert.ok(result.hardFails.some((f) => f.includes("10 Minuten und 0 Sekunden")));
+});
+
 test("extractRouteFacts: finds the block and its byte range for prose-exclusion", () => {
   const text = 'prefix <ROUTE_FACTS>{"distance_m":1,"duration_s":2}</ROUTE_FACTS> suffix';
   const facts = extractRouteFacts(text);

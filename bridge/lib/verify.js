@@ -45,8 +45,21 @@ function extractRouteFacts(text) {
 }
 
 function scanProseNumbers(text, excludeRange) {
-  const prose = excludeRange ? text.slice(0, excludeRange.index) + text.slice(excludeRange.end) : text;
+  let prose = excludeRange ? text.slice(0, excludeRange.index) + text.slice(excludeRange.end) : text;
   const found = [];
+
+  // Compound "N Minuten und M Sekunden" must be recognized as ONE combined duration BEFORE the
+  // individual min/sec scans below run — otherwise "N" gets checked alone against the WHOLE
+  // route duration (as if N minutes were the entire trip), which false-hard-fails even when
+  // N:M together is exactly correct (e.g. "8 Minuten und 30 Sekunden" for a 510s route: "8 min"
+  // alone implies 480s, off by 30s+ from the real duration, even though 8*60+30=510 is exact).
+  // Masked to spaces (same length, so later match indices in `prose` stay valid) once captured,
+  // so the bare min/sec regexes below can't re-match and double-count the same digits.
+  const compoundRe = /(\d+)\s*(?:min|Minuten)\s*(?:und\s*)?(\d+)\s*(?:sek|Sekunden)\b/gi;
+  prose = prose.replace(compoundRe, (whole, minPart, secPart) => {
+    found.push({ kind: "compound-min-sec", statedMin: Number(minPart), statedSec: Number(secPart), match: whole });
+    return " ".repeat(whole.length);
+  });
 
   for (const m of prose.matchAll(/(\d+(?:[.,]\d+)?)\s*km\b/gi)) {
     found.push({ kind: "km", statedValue: parseGermanNumber(m[1]), match: m[0] });
@@ -111,6 +124,11 @@ function verify(answerText, rawRoute) {
     } else if (n.kind === "s") {
       const ok = Math.round(n.statedValue) === expectedDuration;
       if (!ok) warnings.push(`prose contains "${n.match}" — not within an exact-seconds match of the route duration (${expectedDuration} s); likely an unrelated number, flagged not failed`);
+    } else if (n.kind === "compound-min-sec") {
+      const impliedS = n.statedMin * 60 + n.statedSec;
+      const ok = Math.round(impliedS) === expectedDuration;
+      checks.push({ name: `prose "${n.match}" as compound minutes+seconds duration`, expected: expectedDuration, impliedS, pass: ok });
+      if (!ok) hardFails.push(`prose states "${n.match}" (${impliedS} s implied) which disagrees with the route's actual duration ${expectedDuration} s`);
     }
   }
 
