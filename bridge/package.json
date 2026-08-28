@@ -1,0 +1,14 @@
+{
+  "name": "travel-demo-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Anti-hallucination travel-routing bridge: real OSRM routing, LLM only formats.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

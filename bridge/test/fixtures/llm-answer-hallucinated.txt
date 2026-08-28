@@ -1,0 +1,2 @@
+<ROUTE_FACTS>{"distance_m":19500,"duration_s":2275}</ROUTE_FACTS>
+Diese Route von Bremen Flughafen nach Vegesack vermeidet Autobahnen wie gewuenscht. Die Strecke ist etwa 19,5 km lang und dauert rund 38 Minuten. Eine kurze, zuegige Strecke ohne Autobahn.
