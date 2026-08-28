@@ -1,0 +1,7 @@
+.env
+*.env
+node_modules/
+osrm/data/*
+!osrm/data/.gitkeep
+*.log
+.DS_Store
