@@ -143,3 +143,15 @@ anti-hallucination proof — not public exposure. `compose.travel-demo.yml` incl
   they actively *contradict* the facts block.
 - `bridge/test/verify.test.js` proves this check has teeth: it MUST pass a good fixture and MUST
   FAIL a deliberately-hallucinated one — both fixtures are checked in.
+
+## Part of the bunsenbrenner.org demo portfolio
+
+This demo is published as a signed manifest on the live registry, alongside the rest of the
+[bunsenbrenner.org](https://bunsenbrenner.org) demo portfolio. Verified present on
+[`registry.bunsenbrenner.org/manifests`](https://registry.bunsenbrenner.org/manifests) as
+`travel` v0.1.1, carrying a manifest `signature` and `publisher_pubkey` (checked at activation
+time); its guardrail verdict is `clean`.
+
+The registry entry is the installable manifest — **not** a running public service.
+`travel.bunsenbrenner.org` is still not deployed (see "Deployment status" above; the host does not
+currently resolve). Run the demo locally per "Setup".
