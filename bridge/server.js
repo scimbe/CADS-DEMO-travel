@@ -26,6 +26,7 @@ const { createGeocoder } = require("./lib/geocode.js");
 const { routeQuery } = require("./lib/osrmClient.js");
 const { chatCompletion } = require("./lib/llmFormat.js");
 const { PREFERENCE_NAMES } = require("./lib/preferences.js");
+const { collectTouristInfo, fetchWikipediaSummary } = require("./lib/tourism.js");
 
 const LISTEN = process.env.TRAVEL_BRIDGE_LISTEN || "0.0.0.0:8789";
 const MODEL = process.env.LITELLM_DEFAULT_MODEL || "local-devstral-small2";
@@ -129,6 +130,46 @@ async function handlePlanRaw(req, res, query) {
   }
 }
 
+/**
+ * "Sehenswertes entlang der Route" — grounded tourist info for the places the route passes
+ * through. Kept a SEPARATE endpoint from /api/plan on purpose: the plan panels must render
+ * immediately from the OSRM/LLM result, while this enrichment (reverse-geocoding several route
+ * points at Nominatim's 1 req/s, then Wikipedia) takes a few seconds. site/app.js calls this
+ * after the plan returns and fills the section in when it arrives — non-blocking by design.
+ *
+ * Takes the route geometry the client already received from /api/plan (no second OSRM query).
+ * Reuses the same throttled `geocoder`, so its reverse lookups share the one Nominatim rate gate
+ * with the forward geocodes. Every place named here is one the OSRM geometry physically runs
+ * through; every description is a verbatim Wikipedia extract with a source link — nothing invented.
+ */
+async function handleTouristInfo(req, res) {
+  let body;
+  try {
+    body = await readJsonBody(req);
+  } catch (e) {
+    return sendJson(res, 400, { error: e.message });
+  }
+  const geometry = body && body.geometry;
+  const coordinates = Array.isArray(geometry?.coordinates)
+    ? geometry.coordinates
+    : Array.isArray(body?.coordinates)
+      ? body.coordinates
+      : null;
+  if (!coordinates || coordinates.length === 0) {
+    return sendJson(res, 400, { error: "expected {\"geometry\":{\"coordinates\":[[lon,lat],...]}} from a /api/plan route" });
+  }
+  const count = Number.isFinite(body?.count) ? Math.max(2, Math.min(6, Math.floor(body.count))) : 4;
+  try {
+    const result = await collectTouristInfo(
+      { coordinates, count },
+      { reverseGeocode: geocoder.reverseGeocode, fetchWikipedia: fetchWikipediaSummary },
+    );
+    sendJson(res, 200, result);
+  } catch (e) {
+    sendJson(res, 502, { error: e.message });
+  }
+}
+
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, "http://localhost");
   try {
@@ -140,6 +181,9 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method === "GET" && url.pathname === "/api/plan-raw") {
       return await handlePlanRaw(req, res, url.searchParams);
+    }
+    if (req.method === "POST" && url.pathname === "/api/tourist-info") {
+      return await handleTouristInfo(req, res);
     }
     sendJson(res, 404, { error: "not found" });
   } catch (e) {

@@ -25,6 +25,19 @@
   .verify-fail { color: #c0392b; font-weight: 700; }
   .muted { color: #777; font-size: 0.85rem; }
   .error { color: #c0392b; }
+  section.tourism { margin-top: 2rem; }
+  section.tourism > h2 { font-size: 1.15rem; }
+  section.tourism > p.section-lede { color: #555; font-size: 0.9rem; margin-top: -0.25rem; }
+  .tourism-card { display: flex; gap: 0.9rem; border: 1px solid #ccc; border-radius: 8px; padding: 0.9rem; margin-top: 0.75rem; }
+  .tourism-thumb { width: 96px; height: 96px; object-fit: cover; border-radius: 6px; flex: 0 0 auto; background: #eee; }
+  .tourism-card-text { min-width: 0; }
+  .tourism-card h3 { margin: 0 0 0.35rem; font-size: 1rem; }
+  .tourism-card p { margin: 0.35rem 0; }
+  .tourism-src a { color: #1a5fb4; }
+  @media (max-width: 520px) { .tourism-card { flex-direction: column; } .tourism-thumb { width: 100%; height: 140px; } }
+  footer.support { margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid #ccc; font-size: 0.85rem; color: #666; }
+  footer.support a { color: #1a5fb4; }
+  footer.support .links { display: flex; gap: 0.5rem 1rem; flex-wrap: wrap; margin-top: 0.4rem; }
 </style>
 </head>
 <body>
@@ -63,11 +76,34 @@
   </div>
 </div>
 
+<section id="tourism" class="tourism" hidden>
+  <h2>Sehenswertes entlang der Route</h2>
+  <p class="section-lede">
+    Für die Orte, durch die die <strong>berechnete</strong> Route läuft (aus der OSRM-Geometrie
+    zurück-geokodiert), zeigt dieser Abschnitt die Kurzbeschreibung der deutschen Wikipedia —
+    <strong>wortwörtlich</strong> übernommen und mit Quellenlink. Nichts davon ist vom
+    Sprachmodell formuliert oder erfunden.
+  </p>
+  <div id="tourism-body"></div>
+</section>
+
 <p class="muted" style="margin-top:2rem;">
   Diese Demo deckt aktuell nur den Großraum Bremen ab (Auto-Profil). Siehe
   <a href="https://github.com/scimbe/CADS-DEMO-travel">GitHub-Repository</a> für Quellcode,
   Tests und den vollen Nachweis (<code>docs/acceptance-report.md</code>).
 </p>
+
+<footer class="support">
+  <div>Teil des <a href="https://bunsenbrenner.org">bunsenbrenner.org</a>-Demo-Portfolios.</div>
+  <div class="links">
+    <a href="https://steady.page/plans/77a32d9c-c399-4ca1-9515-7a628c7a9413" target="_blank" rel="noopener noreferrer">Als Mitglied unterstützen (Steady)</a>
+    <a href="https://buymeacoffee.com/bunsenbrenner" target="_blank" rel="noopener noreferrer">Buy me a coffee</a>
+    <a href="https://github.com/scimbe/CADS-Tunnel" target="_blank" rel="noopener noreferrer">GitHub</a>
+    <a href="https://bunsenbrenner.org/legal-notice" target="_blank" rel="noopener noreferrer">Impressum</a>
+    <a href="https://bunsenbrenner.org/privacy-policy" target="_blank" rel="noopener noreferrer">Datenschutz</a>
+    <a href="https://bunsenbrenner.org/terms-of-use" target="_blank" rel="noopener noreferrer">Nutzungsbedingungen</a>
+  </div>
+</footer>
 
 <script src="app.js"></script>
 </body>
