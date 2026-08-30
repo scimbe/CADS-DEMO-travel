@@ -22,6 +22,30 @@ const WIKIPEDIA_SUMMARY_BASE =
   process.env.WIKIPEDIA_SUMMARY_BASE || "https://de.wikipedia.org/api/rest_v1/page/summary";
 const WIKIPEDIA_USER_AGENT = process.env.WIKIPEDIA_USER_AGENT || "CADS-Demo-Travel/1.0";
 
+/**
+ * Pure text tidy-up for the verbatim Wikipedia extract: drops the pronunciation IPA span that
+ * German Wikipedia often puts right after a place name ("Hannover [haˈnoːfɐ] …", "Kiel (IPA:
+ * [kiːl]) …"). It reads as noise in the card and would be gibberish for any later speech output.
+ *
+ * This is NOT a rewrite and touches no fact: it only removes bracketed spans that either contain
+ * an IPA stress/length/tone mark (ˈ ˌ ː ˑ ‿ ˥˦˧˨˩) or an explicit "IPA:" label. Ordinary
+ * parentheses with real content — "(Hansestadt)", "(2023)", "(bairisch)" — carry no such marker
+ * and are left untouched. Keeping it a plain, marker-gated string operation (no LLM, no number
+ * handling) preserves the demo's grounding guarantee. Consistent with the shared sanitizer used
+ * centrally in the atlas.
+ */
+function stripPronunciation(t) {
+  return String(t || "")
+    // Bracketed span containing an IPA stress/length/tone mark: "[haˈnoːfɐ]", "(kiːl)".
+    .replace(/[\[(（][^\[\]()（）]*[ˈˌːˑ‿˥˦˧˨˩][^\[\]()（）]*[\])）]/gu, "")
+    // Explicit "IPA: …" span: "(IPA: [kiːl])" leaves "(IPA: )" after the line above, dropped here.
+    .replace(/[\[(（][^\[\]()（）]*\bIPA\b[^\[\]()（）]*[\])）]/gi, "")
+    // Tidy the gaps the removals leave behind (doubled spaces, a space before punctuation).
+    .replace(/\s{2,}/g, " ")
+    .replace(/\s+([,.;:!?])/g, "$1")
+    .trim();
+}
+
 /** Haversine distance in meters between two [lon,lat] points. Used only to space sample points
  *  evenly BY DISTANCE along the polyline (OSRM's vertices are unevenly dense), never to state a
  *  route fact — the route's distance/duration always come from OSRM, not from this. */
@@ -146,10 +170,14 @@ async function fetchWikipediaSummary(title, { fetchImpl = fetch, mustMention = n
   if (!body || body.type === "disambiguation") return null; // ambiguous → skip, don't guess
   const extract = typeof body.extract === "string" ? body.extract.trim() : "";
   if (!extract) return null;
+  // The city-mention guard runs on the RAW extract — the city name lives in prose, never inside
+  // an IPA span, so pronunciation-stripping can't affect this grounding check either way.
   if (mustMention && !extract.toLowerCase().includes(mustMention.toLowerCase())) return null;
   return {
     title: body.title || title,
-    extract, // VERBATIM from Wikipedia — no rephrasing, no LLM
+    // Verbatim from Wikipedia; only the pronunciation IPA span is dropped (see stripPronunciation)
+    // — no rephrasing, no fact touched, no LLM.
+    extract: stripPronunciation(extract),
     url: (body.content_urls && body.content_urls.desktop && body.content_urls.desktop.page) || null,
     thumbnail: (body.thumbnail && body.thumbnail.source) || null,
   };
@@ -218,6 +246,7 @@ async function collectTouristInfo({ coordinates, count = 4 }, { reverseGeocode, 
 
 module.exports = {
   haversineMeters,
+  stripPronunciation,
   sampleRoutePoints,
   pickPlaceName,
   wikipediaTitleCandidates,

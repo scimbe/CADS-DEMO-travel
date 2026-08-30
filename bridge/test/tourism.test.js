@@ -8,7 +8,39 @@ const {
   wikipediaTitleCandidates,
   fetchWikipediaSummary,
   collectTouristInfo,
+  stripPronunciation,
 } = require("../lib/tourism.js");
+
+// --- stripPronunciation ------------------------------------------------------
+
+test("stripPronunciation: removes a bracketed IPA span right after the name", () => {
+  assert.equal(stripPronunciation("Hannover [haˈnoːfɐ] ist eine Stadt."), "Hannover ist eine Stadt.");
+});
+
+test("stripPronunciation: removes an explicit 'IPA: …' span", () => {
+  assert.equal(stripPronunciation("Kiel (IPA: [kiːl]) liegt an der Ostsee."), "Kiel liegt an der Ostsee.");
+});
+
+test("stripPronunciation: strips IPA but keeps a following ordinary parenthesis", () => {
+  assert.equal(stripPronunciation("München [ˈmʏnçn̩] (bairisch) ist groß."), "München (bairisch) ist groß.");
+});
+
+test("stripPronunciation: leaves real parentheses and numbers untouched (no IPA marker)", () => {
+  assert.equal(stripPronunciation("Bremen (Hansestadt) hatte 2023 viele Gäste."), "Bremen (Hansestadt) hatte 2023 viele Gäste.");
+});
+
+test("stripPronunciation: the real Vegesack extract loses only its IPA", () => {
+  assert.equal(
+    stripPronunciation("Vegesack [ˈfeːgəˌzak] ist ein Stadtteil von Bremen innerhalb des Stadtbezirks Nord."),
+    "Vegesack ist ein Stadtteil von Bremen innerhalb des Stadtbezirks Nord.",
+  );
+});
+
+test("stripPronunciation: handles empty/nullish input without throwing", () => {
+  assert.equal(stripPronunciation(""), "");
+  assert.equal(stripPronunciation(null), "");
+  assert.equal(stripPronunciation(undefined), "");
+});
 
 // --- sampleRoutePoints -------------------------------------------------------
 
@@ -97,6 +129,14 @@ test("fetchWikipediaSummary: returns a verbatim extract + source url for a stand
   assert.equal(card.title, "Vegesack");
   assert.equal(card.extract, "Vegesack ist ein Stadtteil von Bremen.");
   assert.equal(card.url, "https://de.wikipedia.org/wiki/T");
+});
+
+test("fetchWikipediaSummary: strips the pronunciation IPA from the returned extract", async () => {
+  const fetchImpl = wikiFetch({
+    Vegesack: STANDARD("Vegesack [ˈfeːgəˌzak] ist ein Stadtteil von Bremen.", { title: "Vegesack" }),
+  });
+  const card = await fetchWikipediaSummary("Vegesack", { fetchImpl, mustMention: "Bremen" });
+  assert.equal(card.extract, "Vegesack ist ein Stadtteil von Bremen.");
 });
 
 test("fetchWikipediaSummary: skips disambiguation pages (returns null, never guesses)", async () => {
