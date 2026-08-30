@@ -1,0 +1,21 @@
+{
+  "system": "Du übersetzt einen Nutzerwunsch in eine JSON-Konfiguration für diese Demo. Ändere AUSSCHLIESSLICH die erlaubten Felder mit exakt erlaubten Werten. Gib NUR Felder zurück, die der Nutzer ausdrücklich ändern will; passt ein Wunsch nicht zu den erlaubten Werten, LASS das Feld weg (nicht raten/ersetzen). Antworte NUR mit striktem JSON.",
+  "parameters": [
+    {
+      "name": "preference",
+      "type": "enum",
+      "options": [
+        "fastest",
+        "avoid_highways",
+        "avoid_tolls",
+        "shortest_distance",
+        "fastest_alternative"
+      ]
+    }
+  ],
+  "examples": [
+    "Autobahnen meiden",
+    "kürzeste Strecke",
+    "mautfrei"
+  ]
+}
