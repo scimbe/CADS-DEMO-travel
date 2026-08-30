@@ -32,9 +32,20 @@ answer, side by side, with every number checked.
 - Real Nominatim geocoding (rate-limited to 1 req/s, bounded to the Bremen bbox, cached).
 - The full request path (free text → LLM intent → real OSRM query → LLM format → mechanical
   verify) has been run live end to end — see `docs/acceptance-report.md`.
-- 38 automated tests (`bridge/test/`), including a live integration test against the real OSRM
-  engine and a negative-control fixture that proves `verify.js` actually has teeth (it must FAIL
-  a deliberately-hallucinated answer, not just pass a good one).
+- **Grounded "Sehenswertes entlang der Route" (tourist info).** `POST /api/tourist-info` samples
+  points from the real OSRM route geometry, reverse-geocodes each to the OSM place it sits in
+  (Nominatim, same 1 req/s throttle as the forward geocoder), and shows that place's German
+  Wikipedia REST-summary *extract verbatim* with a source link — same anti-hallucination stance
+  as the route itself: a place can only appear if the route physically runs through it, the text
+  is never rephrased by the LLM, and disambiguation/missing articles are skipped. Verified live
+  end to end (Bremen Hbf → Vegesack yields Neustadt/Findorff/Burglesum/Vegesack, each with its
+  real Wikipedia extract). It is a separate, non-blocking endpoint so the two plan panels never
+  wait on it.
+- 56 automated tests (`bridge/test/`), including a live integration test against the real OSRM
+  engine, a negative-control fixture that proves `verify.js` actually has teeth (it must FAIL
+  a deliberately-hallucinated answer, not just pass a good one), and the tourist-info grounding
+  logic (distance-based route sampling, the city-qualified-title guard, disambiguation/missing
+  skips) exercised over mocked Nominatim/Wikipedia.
 
 **Known limitations, disclosed rather than hidden:**
 - **Car profile only, Bremen only (v1 scope).** Bike/foot profiles and a larger region are a
@@ -54,18 +65,21 @@ answer, side by side, with every number checked.
   scanner isn't spelled-out-unit-aware for "Meter", and separately misread "2.126 Sekunden" as
   the number 2.126 rather than 2126 — both correctly demoted to non-blocking warnings rather than
   false failures, exactly as designed.
-- **`site/` has not been tested through Caddy/a real browser** — only the bridge's HTTP API has
-  been exercised live (`docs/acceptance-report.md`). The static page + `app.js` are written but
-  unverified beyond a read-through; verify visually before treating the UI itself as proven.
+- **`site/` has been rendered and driven in a real browser against *mocked* API responses, but
+  not yet through the full live Caddy + OSRM + LLM stack.** All three sections (raw OSRM panel,
+  LLM-answer panel, and the new "Sehenswertes entlang der Route" section) plus the support/legal
+  footer render and behave correctly, and the "mit KI"-panel now degrades gracefully instead of
+  going blank when a response lacks a `verify` object (see below). The remaining gap is an
+  end-to-end run of the static page against the real bridge behind Caddy.
 
 ## Repo layout
 
 ```
 osrm/            OSRM engine: Dockerfile, fetch/build scripts, the data pin (REGIONS.md)
 bridge/          The whole API surface — Node, zero external dependencies (node:http, node:test)
-  lib/           preferences.js, osrmClient.js, geocode.js, llmFormat.js, verify.js
-  test/          38 tests, incl. fixtures (a good AND a deliberately-hallucinated LLM answer)
-site/            Static page — raw-engine panel and LLM-answer panel side by side
+  lib/           preferences.js, osrmClient.js, geocode.js, llmFormat.js, verify.js, tourism.js
+  test/          56 tests, incl. fixtures (a good AND a deliberately-hallucinated LLM answer)
+site/            Static page — raw-engine panel, LLM-answer panel, and "Sehenswertes" section
 scripts/         acceptance-check.sh (the deliverable proof run) + its two Node helpers
 deploy/caddy/    Caddyfile (not yet deployed, see above)
 docs/            onboarding.md, operations.md, acceptance-report.md (generated)
@@ -143,6 +157,14 @@ anti-hallucination proof — not public exposure. `compose.travel-demo.yml` incl
   they actively *contradict* the facts block.
 - `bridge/test/verify.test.js` proves this check has teeth: it MUST pass a good fixture and MUST
   FAIL a deliberately-hallucinated one — both fixtures are checked in.
+- The same stance extends to the tourist info: `POST /api/tourist-info {"geometry": {...}}` (the
+  geometry the client already got back from `/api/plan`, so no second OSRM query) never lets the
+  model name a place or write a description. `tourism.js` samples the real route geometry,
+  reverse-geocodes each point to an OSM place (so the place is one the route physically passes),
+  and renders the German Wikipedia summary *extract verbatim* with a source link — the
+  city-qualified title is tried first and the extract must mention the city, which rejects a
+  same-named place elsewhere; disambiguation pages and missing articles are skipped, never
+  guessed. There is deliberately no LLM rephrasing step, so there is no number to guard.
 
 ## Part of the bunsenbrenner.org demo portfolio
 
